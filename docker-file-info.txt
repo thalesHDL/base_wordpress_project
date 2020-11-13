@@ -1,0 +1,92 @@
+#-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------#
+#                                                                                     Nginx                                                                                                #
+#-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------#
+O nginx funciona como um midlewere entre a aplicação e a internet, podendo ser utilizado como web server, além de possibilitar a criação de proxys e outras funcionalidades.
+
+Para nos ele será mais utilizado como um web server de arquivos estáticos, segue abaixo um exemplo de como configurar o nginx para servir arquivos estáticos:
+
+	server {
+		listen   80;
+		root /var/http/www;
+		index index.php index.html index.htm;
+		server_name example.com; 
+
+		location / {
+			try_files $uri $uri/ /index.html;
+		}
+	}
+
+Para entender esta configuração é necessário entender um pouco de como funciona um web server de arquivos estáticos. Um web server basicamente é um cara que fica escutando um porto verificando se ele reconhece o que está sendo enviado para o porto, caso ele reconheça ele executa uma ação retornando algo para quem enviou a mensagem para o porto. Como no nosso caso ele escutará requisições de arquivos estáticos sua ação será validar se o arquivo existe e se existir ele deverá retornar este arquvio como resposta para a requisição.
+
+Acima há uma configuração para um servidor de arquivos estáticos. A tag 'server' diz que aquela estrutura representa um servidor, ou seja o cara que fica escutando no porto.
+
+Sendo assim é necessário que seja definido em qual porto este cara vai escutar, o que é feito pela tag 'listen', que define que o servior irá escutar as mensagens que chegarem no porto 80 (é o porto utilizado para a comunicação via http, que é o protocolo mais utilizado para transferencias de arquivos na internet, sendo assim, utilizando este porto ele escutará todas as mensgens que chegar pela internet ao host onde esta hospedado).
+
+Além disto, como se trata de um servidor de arquivos estáticos é necessário informar também qual o diretorio deve ser utilizado como base para ele procurar pelos arquivos, isto é definido pela tag 'root', que define como diretorio base 'var/http/www', deste modo sempre que chegar uma requisição ele verificará se o arquivo existe neste diretório, por exemplo chega uma requisição para o arquivo /path/to/file.txt, então ele irá procurar por este path dentro do diretorio root, ficando assim /var/http/www/path/to/file.txt, caso o arquivo exista neste path ele será retornado.
+
+So o fato de digitar algo na barra de url dos browsers já é uma requisição, e existem certos padrões para a construções de urls de aplicações e colocar o nome completo do arquivo á que se refere não é algo muito bem visto. Imagine que para acessar o google fosse necessário digitar google.com.br/index.html, não é algo muito bonito. Então o que as aplicações fazem é definir um arquivo padrão para a chamada base que é '/', esse arquivo geralmente é chamado de index. Esta configuração é feita atravês da tag 'index'.
+
+Além disto é possível definir também o nome do dominio que é feito pela tag 'server_name'. Esta tag é importante, pq um mesmo porto pode conter vários referenciar varios dominios, como: google.com.br, youtube.com.br. Sendo assim além de definir o porto é necessário identificar o nome do dominio, pois é assim que o servidor vai saber se ele deve tentar processar a requisição ou não.
+
+Por fim, como os diretorios são divididos '/' e até mesmo as requicições http também são separadas por '/' por padrão. A o caminho completo para o arquivo ou para a requisição é chamado de rota, e o nginx também fornece uma forma de realizar um tratamento para diferentes rotas ou diferentes tipos de arquivos. Isto é feito atravês da tag 'location' que permite definir atravês de expreções regex uma forma de realizar o match entre a rota enviada pela requisição e um recurso fornecido pelo servidor (arquivos, endpoints). Além disto, utiliznado o location também é possível realizar tratamentos nos arquivos de algum diretorio em específico antes de retorna-lo como resposta, geralmente aplicado para arquivos zipados e imagens, é possível também criar proxys, por exemplo a requisição é apenas /images/teste.png, e para ficar no padrão sem ser necessário passsar todo o caminho dai ao tratar a rota mencionanda anteriormente é possível redireciona-la para a rota certa, alterando o root para por exemplo /app, fazendo com que o path final seja /app/images/teste.png, dentre as várias outras aplicações de proxy.
+
+Além disto o nginx também oferece suport para o fastCGI, que é uma versão melhorada do CGI (Common Gateway Interface). O CGI é o canal de comunicação entre os servidores HTTP e as aplicações web, é ele o responsavel pelo processamento da requisição. Como foi dito anteriormente o servidor web é so um cara que fica recebendo requisições e baseado na requisição retorna uma resposta, e quem faz esse meio de campo entre o recebimento da requisição e o retorno da resposta é o CGI. Por exemplo, caso seja requisitado um arquivo executavel, é o CGI que executará este arquivo retornando o resultado da execução do arquivo. Como é o CGI que esta executando o arquivo é possível interagir com ele atraves de algumas variaveis de ambiente e até mesmo utilizando informações passadas na propria requisição, ao final do processamento o que é retornado ao cliente é o que foi gerado no STDOUT durante a execução do arquivo (basicamente tudo que foi printato  pelo programa é o que é retornado como resposta, ou caso o arquivo possua um conteudo estatico, este conteudo é retornado como resposta)
+
+Algumas variaveis de ambiente do CGI:
+	REMOTE_ADDR: o addr de quem fez a requisição
+	REQUEST_METHOD: qual metodo http foi usado na requisição
+	QUERY_STRING: os parametros passados na requisição (desde que eles estejam dentro do padrão reconhecido pelo CGI)
+
+O php é uma linguagem que é executada por um CGI e por isso para configurar o nginx para servir arquivos php corretamente tem que apontar o parametro fastcgi_pass para o host que disponibiliza o CGI para o php, além disto tem como configurar outras variaveis como buffers, buffer_size, index dentre outros params.
+	
+
+	location ~ \.php$ {
+        	fastcgi_pass  php-fpm:9000;
+        	fastcgi_index index.php;
+	        fastcgi_buffers 16 16k;
+	        fastcgi_buffer_size 32k;
+	        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+	        fastcgi_param QUERY_STRING    $query_string;
+		include fastcgi_params;
+    	}
+
+Neste exemplo, toda requisição de arquivo com o final '.php' é capturada por este location e o arquivo é passado para o host do php que foi definido para localhost:9000, ou seja para que isso funcione é necessário ter um servidor php rodando na maquina local na porta 9000.
+
+
+
+
+
+
+
+#-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------#
+#                                                                                     Docker                                                                                                #
+#-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------#
+O docker é um software que possibilita a construção de aplicações baseadas em containers.
+
+Esses containers funcionam como um ambiente separado do sistema operacional, e o docker faz a ponte entre os containers e o sistema operacional. Com isso é possivel ter aplicações inteiramente desacopladas além de possibilitar uma facilidade enorme no setup das aplicações, pois permite que os componentes utilizados para construir a aplicação, como, banco de dados, servidores web e até algumas linguagens como php, sejam instalados em um container e interajam entre si por uma rede também controlada pelo docker.
+
+
+
+
+
+
+
+#-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------#
+#                                                                                    Wordpress                                                                                              #
+#-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------#
+Plugins
+
+Widgets
+
+Themes
+
+
+
+
+
+
+#-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------#
+#                                                                                     Links                                                                                                #
+#-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------#
+FastCGI = https://klauslaube.com.br/2012/11/02/entendendo-o-cgi-fastcgi-e-wsgi.html
+
